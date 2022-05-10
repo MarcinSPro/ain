@@ -112,6 +112,10 @@ build_conf() {
 
     echo "> build-conf: target: ${target} / conf_args: ${make_conf_opts} / jobs: ${make_jobs}"
 
+    # Patching emitted C++ files
+    echo "#include <rpc/libain_wrapper.hpp>" > "$(pwd)/src/rpc/libain.cpp"
+    cat "$(pwd)/depends/${target}/libain.cpp" >> "$(pwd)/src/rpc/libain.cpp"
+
     ./autogen.sh
     # XREF: #make-configure
     # ./configure --prefix="$(pwd)/depends/x86_64-pc-linux-gnu"
@@ -289,7 +293,7 @@ docker_release_git() {
 }
 
 docker_build_deploy_git() {
-    git_version 
+    git_version
     docker_build "$@"
     docker_deploy "$@"
 }
