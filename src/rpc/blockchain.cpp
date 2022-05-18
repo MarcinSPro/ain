@@ -831,7 +831,7 @@ static UniValue getblockheader(const JSONRPCRequest& request)
     return blockheaderToJSON(tip, pblockindex);
 }
 
-static CBlock GetBlockChecked(const CBlockIndex* pblockindex)
+CBlock GetBlockChecked(const CBlockIndex* pblockindex)
 {
     CBlock block;
     if (IsBlockPruned(pblockindex)) {
