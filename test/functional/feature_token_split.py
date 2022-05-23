@@ -5,7 +5,7 @@
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 # TODO
-# Multiple pools with split stock
+# Multiple pools with split stock OK
 # Both sides with split token
 # Two splits same height
 # MINIMUM_LIQUIDITY 1000sats
@@ -188,11 +188,6 @@ class TokenSplitTest(DefiTestFramework):
         self.nodes[0].generate(1)
         self.symbolT2_DUSD = "T2-DUSD"
         self.idT2_DUSD = list(self.nodes[0].gettoken(self.symbolT2_DUSD).keys())[0]
-        self.nodes[0].setgov({"ATTRIBUTES":{f'v0/poolpairs/{self.idT2_DUSD}/token_a_fee_pct': '0.01', #
-                                            f'v0/poolpairs/{self.idT2_DUSD}/token_b_fee_pct': '0.03',
-                                            f'v0/token/{self.idT2}/dex_in_fee_pct': '0.02',
-                                            f'v0/token/{self.idT2}/dex_out_fee_pct': '0.005'}})
-        self.nodes[0].generate(1)
 
         self.nodes[0].createpoolpair({
             "tokenA": self.symbolT3,
@@ -204,6 +199,15 @@ class TokenSplitTest(DefiTestFramework):
         self.nodes[0].generate(1)
         self.symbolT3_DUSD = "T3-DUSD"
         self.idT3_DUSD = list(self.nodes[0].gettoken(self.symbolT3_DUSD).keys())[0]
+        self.nodes[0].setgov({"ATTRIBUTES":{f'v0/poolpairs/{self.idT3_DUSD}/token_a_fee_pct': '0.01',
+                                            f'v0/poolpairs/{self.idT3_DUSD}/token_b_fee_pct': '0.03',
+                                            f'v0/token/{self.idT3}/dex_in_fee_pct': '0.02',
+                                            f'v0/token/{self.idT3}/dex_out_fee_pct': '0.005'}})
+
+        self.nodes[0].setgov({"LP_SPLITS": { str(self.idT3): 1}})
+        self.nodes[0].setgov({"LP_LOAN_TOKEN_SPLITS": { str(self.idT3): 1}})
+
+        self.nodes[0].generate(1)
 
         self.nodes[0].createpoolpair({
             "tokenA": self.symbolT1,
@@ -271,7 +275,8 @@ class TokenSplitTest(DefiTestFramework):
     def run_test(self):
         self.setup()
 
-        self.pool_split_T1_DUSD()
+        self.token_split_T3()
+        self.token_split_T1()
         self.setup_test_vaults()
         self.vault_split()
 
@@ -308,7 +313,6 @@ class TokenSplitTest(DefiTestFramework):
 
         # Check old token
         result = self.nodes[0].gettoken(token_id)[token_id]
-        breakpoint()
         assert_equal(result['symbol'], f'{token_symbol}{token_suffix}')
         assert_equal(result['minted'], Decimal('0.00000000'))
         assert_equal(result['mintable'], False)
@@ -362,7 +366,7 @@ class TokenSplitTest(DefiTestFramework):
         for val in result:
             assert_equal(val.find(f'{token_symbol}{token_suffix}'), -1)
 
-    def check_pool_split(self, pool_id, pool_symbol, token_id, token_symbol, token_suffix, minted, reserve_a, reserve_b):
+    def check_pool_split(self, pool_id, pool_symbol, token_id, token_symbol, token_suffix, reserve_a, reserve_b, reserve_a_b, reserve_b_a):
 
         # Check old pool
         result = self.nodes[0].getpoolpair(pool_id)[pool_id]
@@ -399,11 +403,12 @@ class TokenSplitTest(DefiTestFramework):
 
         # Check new pool
         result = self.nodes[0].getpoolpair(pool_id)[pool_id]
+        breakpoint()
         assert_equal(result['symbol'], f'{pool_symbol}')
-        assert_equal(result['reserveA'], Decimal(f'{minted}'))
-        assert_equal(result['reserveB'], self.poolT2_DUSDTotal)
-        assert_equal(result['reserveA/reserveB'], reserve_a)
-        assert_equal(result['reserveB/reserveA'], reserve_b)
+        assert_equal(result['reserveA'], reserve_a)
+        assert_equal(result['reserveB'], reserve_b)
+        assert_equal(result['reserveA/reserveB'], reserve_a_b)
+        assert_equal(result['reserveB/reserveA'], reserve_b_a)
         assert_equal(result['idTokenA'], str(token_id))
         assert_equal(result['status'], True)
         assert_equal(result['tradeEnabled'], True)
@@ -411,8 +416,8 @@ class TokenSplitTest(DefiTestFramework):
         assert_equal(result['dexFeePctTokenB'], Decimal('0.03000000'))
         assert_equal(result['dexFeeInPctTokenA'], Decimal('0.01000000'))
         assert_equal(result['dexFeeOutPctTokenA'], Decimal('0.01000000'))
-        assert_equal(result['rewardPct'], Decimal('1.00000000'))
-        assert_equal(result['rewardLoanPct'], Decimal('1.00000000'))
+        assert_equal(result['rewardPct'], Decimal('0E-8'))
+        assert_equal(result['rewardLoanPct'], Decimal('0E-8'))
         assert_equal(result['creationTx'], self.nodes[0].getblock(self.nodes[0].getbestblockhash())['tx'][2])
         assert_equal(result['creationHeight'], self.nodes[0].getblockcount())
 
@@ -422,6 +427,7 @@ class TokenSplitTest(DefiTestFramework):
             assert_equal(val.find(f'{pool_symbol}{token_suffix}'), -1)
 
         # Check that LP_SPLITS and LP_LOAN_TOKEN_SPLITS updated
+        breakpoint()
         assert_equal(self.nodes[0].getgov('LP_SPLITS')['LP_SPLITS'], {pool_id: Decimal('1.00000000')})
         assert_equal(self.nodes[0].getgov('LP_LOAN_TOKEN_SPLITS')['LP_LOAN_TOKEN_SPLITS'], {pool_id: Decimal('1.00000000')})
 
@@ -493,7 +499,54 @@ class TokenSplitTest(DefiTestFramework):
         self.nodes[0].setgov({"ATTRIBUTES":{f'v0/locks/token/{self.idT3}':'false'}})
         self.nodes[0].generate(1)
 
-    def pool_split_T1_DUSD(self):
+    def token_split_T3(self):
+        self.nodes[0].generate(30) # Go to GreatWorldHeight
+
+        # Check pool before split
+        result = self.nodes[0].getpoolpair(self.symbolT3_DUSD)[self.idT3_DUSD]
+        assert_equal(result['reserveA'], Decimal('100000000.00000000'))
+        assert_equal(result['reserveB'], Decimal('1.00000000'))
+        assert_equal(result['reserveA/reserveB'], Decimal('100000000.00000000'))
+        assert_equal(result['reserveB/reserveA'], Decimal('1E-8'))
+        assert_equal(result['status'], True)
+        assert_equal(result['tradeEnabled'], True)
+
+        # Lock token
+        self.nodes[0].setgov({"ATTRIBUTES":{f'v0/locks/token/{self.idT3}':'true'}})
+        self.nodes[0].generate(1)
+        # Token split
+        self.nodes[0].setgov({"ATTRIBUTES":{f'v0/oracles/splits/{str(self.nodes[0].getblockcount() + 2)}':f'{self.idT3}/2'}})
+        self.nodes[0].generate(2)
+
+        # Check token split correctly
+        self.check_token_split(self.idT3, self.symbolT3, '/v1', 2, Decimal('200000000.00000000'), True, False)
+
+        # Check pool migrated successfully
+        self.check_pool_split(self.idT3_DUSD, self.symbolT3_DUSD, self.idT3, self.symbolT3, '/v1', Decimal('200000000.00000000'), Decimal('1.00000000'), Decimal('200000000.00000000'), Decimal('0E-8'))
+
+        # Swap old for new values
+        self.idT2 = list(self.nodes[0].gettoken(self.symbolT2).keys())[0]
+        self.idT2_DUSD = list(self.nodes[0].gettoken(self.symbolT2_DUSD).keys())[0]
+
+        # Token split
+        self.nodes[0].setgov({"ATTRIBUTES":{f'v0/oracles/splits/{str(self.nodes[0].getblockcount() + 2)}':f'{self.idT2}/-3'}})
+        self.nodes[0].generate(2)
+
+        # Check token split correctly
+        minted = truncate(str(self.poolT2_DUSDTotal * 2 / 3), 8)
+        self.check_token_split(self.idT2, self.symbolT2, '/v2', -3, minted, False, True)
+
+        # Check pool migrated successfully
+        self.check_pool_split(self.idT2_DUSD, self.symbolT2_DUSD, self.idT2, self.symbolT2, '/v2', minted, Decimal('0.66666666'), Decimal('1.50000000'))
+
+        # Swap old for new values
+        self.idT2 = list(self.nodes[0].gettoken(self.symbolT2).keys())[0]
+
+        # Unlock token
+        self.nodes[0].setgov({"ATTRIBUTES":{f'v0/locks/token/{self.idT2}':'false'}})
+        self.nodes[0].generate(1)
+
+    def token_split_T1(self):
         self.nodes[0].generate(30) # Go to GreatWorldHeight
 
         # Check pool before split
