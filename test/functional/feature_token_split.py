@@ -204,8 +204,8 @@ class TokenSplitTest(DefiTestFramework):
                                             f'v0/token/{self.idT3}/dex_in_fee_pct': '0.02',
                                             f'v0/token/{self.idT3}/dex_out_fee_pct': '0.005'}})
 
-        self.nodes[0].setgov({"LP_SPLITS": { str(self.idT3): 1}})
-        self.nodes[0].setgov({"LP_LOAN_TOKEN_SPLITS": { str(self.idT3): 1}})
+        self.nodes[0].setgov({"LP_SPLITS": { str(self.idT3_DUSD): 1}})
+        self.nodes[0].setgov({"LP_LOAN_TOKEN_SPLITS": { str(self.idT3_DUSD): 1}})
 
         self.nodes[0].generate(1)
 
